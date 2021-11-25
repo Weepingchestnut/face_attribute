@@ -1,0 +1,7 @@
+test_data/
+work_dir/
+your_pathcrop_rapv2/
+checkpoint/
+data_list/
+model/bn_inception-52deb4733.pth
+model/model360.pth
