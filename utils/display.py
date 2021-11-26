@@ -87,20 +87,17 @@ def face_attr_dict(c_output_list, f_output_list, m_output_list):
     if max(race) < 0.5:     # 未知
         pass
     else:
-        race_index = race.index(max(race))
-        face_dict['种族'] = race_dict[race_index]
+        face_dict['种族'] = race_dict[race.index(max(race))]
 
     if max(hair_style) < 0.1:
         pass
     else:
-        hair_style_index = hair_style.index(max(hair_style))
-        face_dict['发型'] = hair_style_dict[hair_style_index]
+        face_dict['发型'] = hair_style_dict[hair_style.index(max(hair_style))]
 
     if max(hair_color) < 0.1:
         pass
     else:
-        hair_color_index = hair_color.index(max(hair_color))
-        face_dict['发色'] = hair_color_dict[hair_color_index]
+        face_dict['发色'] = hair_color_dict[hair_color.index(max(hair_color))]
 
     if glasses > 0.1:
         face_dict['是否戴眼镜'] = is_dict[0]
@@ -112,8 +109,7 @@ def face_attr_dict(c_output_list, f_output_list, m_output_list):
     else:
         face_dict['是否戴帽子'] = is_dict[1]
 
-    mask_index = m_output_list.index(max(m_output_list))
-    face_dict['是否戴口罩'] = is_dict[mask_index]
+    face_dict['是否戴口罩'] = is_dict[m_output_list.index(max(m_output_list))]
 
     return face_dict
 
@@ -434,7 +430,7 @@ def mask_face_attr_dict(output_list):
 
 
 if __name__ == '__main__':
-    F1 = [0]*18
+    F1 = [0] * 18
     print(F1)
 
 
