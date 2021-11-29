@@ -11,6 +11,7 @@ import torchvision.transforms as transforms
 import tornado
 from torch.backends import cudnn
 
+import torch.utils.data as data
 import model as models
 from utils.datasets import attr_nums
 from utils.display import *
@@ -21,10 +22,6 @@ warnings.filterwarnings('ignore')
 parser = argparse.ArgumentParser(description='Face Attribute Framework')
 parser.add_argument('--batch_size', default=128, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--num_workers', default=0, type=int, required=False, help='(default=%(default)d)')
-parser.add_argument('--test_data_path', default='test_data/shisuo_face_test', type=str, required=False,
-                    help='(default=%(default)s)')
-parser.add_argument('-s', '--show', dest='show', action='store_true', required=False,
-                    help='show attribute in imag')
 
 args = parser.parse_args()
 
@@ -63,45 +60,75 @@ def isBase64(s):
     return True
 
 
-# class base64_api(tornado.web.RequestHandler):
-#     def initialize(self, gconf):
-#         self.config = gconf
-#         self.pool = gconf.get("threadpool", None)
-#
-#     @tornado.web.asynchronous
-#     @tornado.gen.coroutine
-#     def post(self, *aegs, **kwargs):
-#         request = json.loads(self.request.body)
-#         img_id = request.get('img_id', '')
-#         base64_code = request.get('base64_code', '')
-#
-#         response = dict()
-#         if not isBase64(base64_code):
-#             response["face_attribute"] = dict()
-#             response["face_attribute"]["success"] = False
-#             response["face_attribute"]["img_code"] = base64_code
-#             response["face_attribute"]["message"] = '图片损坏/非base64编码'
-#             response["spendTime"] = "0 s"
-#         else:
-#             start_time = time.time()
-#             try:
-#                 image = base64_to_pil(base64_code)
-#                 attr_dict = face_attr(image)
-#                 stat = True
-#             except:
-#                 stat = False
-#             end_time = time.time()
-#
-#             response["face_attribute"] = dict()
-#             if not stat:
-#                 response["face_attribute"]["message"] = '属性提取失败'
-#             else:
-#                 response["face_attribute"]["message"] = '属性提取成功'
-#                 response["face_attribute"]["img_id"] = img_id
-#                 response["face_attribute"]["attribute"] = attr_dict
-#             response["spend_time"] = str(round((end_time - start_time), 4) * 1000) + " ms"
-#         print(response)
-#         self.write(response)
+def res_message(img_index, mode):
+    if mode == 'id':
+        return '第' + str(img_index) + '张图片id为空'
+    elif mode == 'base64':
+        return '第' + str(img_index) + '张图片损坏/非base64编码'
+    elif mode == 'dict_format':
+        return '第' + str(img_index) + '张图片JSON格式错误'
+
+
+def is_need_dict(img_dict):
+    return 'img_id' in img_dict.keys() and 'base64_code' in img_dict.keys()
+
+
+class base64_api(tornado.web.RequestHandler):
+    def initialize(self, gconf):
+        self.config = gconf
+        self.pool = gconf.get("threadpool", None)
+
+    # @tornado.web.asynchronous
+    @tornado.gen.coroutine
+    def post(self, *aegs, **kwargs):
+        request = json.loads(self.request.body)
+        # img_id = request.get('img_id', '')
+        # base64_code = request.get('base64_code', '')
+        img_list = request.get('img_list', '')
+
+        test_dataset = get_interface_data(imgs_list=img_list)
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True
+        )
+
+        stat = True
+        response = {'success': True, 'message': ['属性提取成功'], 'attribute': [], 'spendTime': '0 ms'}
+        for i, img_dict in enumerate(img_list):
+            # 判断JSON是否满足dict格式要求
+            if not is_need_dict(img_dict):
+                response['success'] = False
+                response['message'][0] = '属性提取失败'
+                response['message'].append(res_message(i + 1, 'dict_format'))
+                stat = False
+            else:
+                # 图片id为空（字符串长度为0 or 字符串均为空格）
+                if len(str(img_dict['img_id'])) == 0 or str(img_dict['img_id']).isspace is True:
+                    response['success'] = False
+                    response['message'][0] = '属性提取失败'
+                    response['message'].append(res_message(i + 1, 'id'))
+                    stat = False
+
+                if not isBase64(img_dict['base64_code']):
+                    response['success'] = False
+                    response['message'][0] = '属性提取失败'
+                    response['message'].append(res_message(i + 1, 'base64'))
+                    stat = False
+
+        if not stat:
+            # print("stat = False")
+            pass
+        else:
+            # print("stat = True")
+            start_time = time.time()
+            response['attribute'] = test(test_loader, celeba_model, fairface_model, face_mask_model)
+            end_time = time.time()
+            # print(str(round((end_time - start_time), 4) * 1000) + " ms")
+            # response['message'].append('属性提取成功')
+            response['spendTime'] = str(round((end_time - start_time), 4) * 1000) + " ms"
+
+        print(response)
+        self.write(response)
 
 
 def pil_to_base64(p264_img):
@@ -117,6 +144,24 @@ def base64_to_pil(base64_str):
     img = BytesIO(img)
     img = Image.open(img)  # .convert('RGB')
     return img
+
+
+class get_interface_data(data.Dataset):
+    def __init__(self, imgs_list, transform=transform_test, loader=base64_to_pil):
+        self.images = imgs_list
+        self.transform = transform
+        self.loader = loader
+
+    def __getitem__(self, index):
+        img_id = self.images[index]['img_id']
+        img = self.loader(self.images[index]['base64_code'])
+
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, img_id
+
+    def __len__(self):
+        return len(self.images)
 
 
 def prepare_model():
@@ -205,39 +250,124 @@ def loop_test(data_path):
     print("infer speed = {}".format(img_num / during))
 
 
-def interface_test(test_data_path):
-    imag = Image.open(test_data_path).convert('RGB')
+def interface_test():
+    imag = Image.open('test_data/shisuo_face_test/face_于洪-4G清水湾温泉_123.296744_41.79479_20210416104413_0.9802733.jpg').convert('RGB')
     base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
-    print("base64 = {}".format(base64_code))
+    # print("base64 = {}".format(base64_code))
+    img1 = {
+        'img_id': 'face_于洪-4G清水湾温泉_123.296744_41.79479_20210416104413_0.9802733.jpg',
+        'base64_code': base64_code
+    }
 
-    response = dict()
-    if not isBase64(base64_code):
-        response["face_attribute"] = dict()
-        response["face_attribute"]["success"] = False
-        response["face_attribute"]["img_code"] = base64_code
-        response["face_attribute"]["message"] = '图片损坏/非base64编码'
-        response["spendTime"] = "0 s"
-    else:
-        start_time = time.time()
-        try:
-            image = base64_to_pil(base64_code)
-            attr_dict = face_attr(image)
-            stat = True
-        except:
+    imag = Image.open('test_data/shisuo_face_test/face_于洪-ZH西湖叠院东门人行出_123.193184_41.799646_20210416113518_0.9816.jpg').convert('RGB')
+    base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
+    # print("base64 = {}".format(base64_code))
+    img2 = {
+        'img_id': 'face_于洪-ZH西湖叠院东门人行出_123.193184_41.799646_20210416113518_0.9816.jpg',
+        'base64_code': base64_code
+    }
+
+    imag = Image.open('test_data/shisuo_face_test/face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg').convert('RGB')
+    base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
+    # print("base64 = {}".format(base64_code))
+    img3 = {
+        'img_id': 'face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg',
+        'base64_code': base64_code
+    }
+
+    info_list = [img1, img2, img3]
+    # pprint(info_list)
+
+    test_dataset = get_interface_data(imgs_list=info_list)
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
+        batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True
+    )
+
+    stat = True
+    response = {'success': True, 'message': ['属性提取成功'], 'attribute': [], 'spendTime': '0 ms'}
+    for i, img_dict in enumerate(info_list):
+        # 判断JSON是否满足dict格式要求
+        if not is_need_dict(img_dict):
+            response['success'] = False
+            response['message'][0] = '属性提取失败'
+            response['message'].append(res_message(i + 1, 'dict_format'))
             stat = False
-        end_time = time.time()
-
-        response["face_attribute"] = dict()
-        if not stat:
-            response["face_attribute"]["message"] = '属性提取失败'
         else:
-            response["face_attribute"]["message"] = '属性提取成功'
-            response["face_attribute"]["img_id"] = "img_test"
-            response["face_attribute"]["attribute"] = attr_dict
-        response["spend_time"] = str(round((end_time - start_time), 4) * 1000) + " ms"
+            # 图片id为空（字符串长度为0 or 字符串均为空格）
+            if len(str(img_dict['img_id'])) == 0 or str(img_dict['img_id']).isspace is True:
+                response['success'] = False
+                response['message'][0] = '属性提取失败'
+                response['message'].append(res_message(i + 1, 'id'))
+                stat = False
+
+            if not isBase64(img_dict['base64_code']):
+                response['success'] = False
+                response['message'][0] = '属性提取失败'
+                response['message'].append(res_message(i + 1, 'base64'))
+                stat = False
+
+    if not stat:
+        # print("stat = False")
+        pass
+    else:
+        # print("stat = True")
+        start_time = time.time()
+        response['attribute'] = test(test_loader, celeba_model, fairface_model, face_mask_model)
+        end_time = time.time()
+        # print(str(round((end_time - start_time), 4) * 1000) + " ms")
+        # response['message'].append('属性提取成功')
+        response['spendTime'] = str(round((end_time - start_time), 4) * 1000) + " ms"
+
     print(response)
 
 
+def test(test_loader, c_model, f_model, m_model):
+    c_model.eval()
+    f_model.eval()
+    m_model.eval()
+    attr = []
+    img_dict = {'img_id': '', 'attr_dict': dict()}
+
+    for i, _ in enumerate(test_loader):
+        # print(i+1)
+        input, img_name = _
+        input = input.cuda(non_blocking=True)
+        c_output, f_output, m_output = c_model(input), f_model(input), m_model(input)
+        bs = input.size(0)
+        # print("bs = {}".format(bs))
+
+        # maximum voting
+        c_output = torch.max(torch.max(torch.max(c_output[0], c_output[1]), c_output[2]), c_output[3])
+        f_output = torch.max(torch.max(torch.max(f_output[0], f_output[1]), f_output[2]), f_output[3])
+        m_output = torch.max(torch.max(torch.max(m_output[0], m_output[1]), m_output[2]), m_output[3])
+
+        c_output = torch.sigmoid(c_output.data).cpu().numpy()
+        f_output = torch.sigmoid(f_output.data).cpu().numpy()
+        m_output = torch.sigmoid(m_output.data).cpu().numpy()
+
+        for one_bs in range(bs):
+            # print("img_name: {}".format(img_name[one_bs]))
+            one_img_name = img_name[one_bs]
+            c_output_list = c_output[one_bs].tolist()
+            f_output_list = f_output[one_bs].tolist()
+            m_output_list = m_output[one_bs].tolist()
+
+            # 置信度微调
+            if max(f_output_list[10], f_output_list[11], f_output_list[12], f_output_list[14],
+                   f_output_list[15], f_output_list[16]) > 0.8:
+                pass
+            else:
+                f_output_list[13] = f_output_list[13] * 1.5
+
+            attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list)
+
+            img_dict['img_id'] = one_img_name
+            img_dict['attr_dict'] = attr_dict
+            attr.append(img_dict)
+            # pprint(attr_dict)
+    return attr
+
+
 if __name__ == '__main__':
-    interface_test("test_data/shisuo_face_test/face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210425194134_0.9804584.jpg")
-    # loop_test(args.test_data_path)
+    interface_test()

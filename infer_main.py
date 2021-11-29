@@ -95,12 +95,12 @@ def batch_test(test_data_path):
     during = (b - a).seconds
     print("batch_size = {}".format(args.batch_size))
     print("num_workers = {}".format(args.num_workers))
-    print("image_num = {}".format(test_dataset.__len__()))
-    print("time = {}".format(during))
-    if during == 0:
+    print("image_num = {} 张".format(test_dataset.__len__()))
+    print("time = {} s".format(during))
+    try:
+        print("infer speed = {} 张/s".format(test_dataset.__len__() / during))
+    except ZeroDivisionError:
         print("推理时间不足1s")
-    else:
-        print("infer speed = {}".format(test_dataset.__len__() / during))
 
 
 def test(test_loader, c_model, f_model, m_model):

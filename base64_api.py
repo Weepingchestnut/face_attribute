@@ -15,7 +15,7 @@ def make_app(config):
     threadpools = threadpool.ThreadPool(config.get("maxThread", 200))
     config["threadpool"] = threadpools
     return tornado.web.Application([
-        (r"/", base64_api, dict(gconf=config))
+        (r"/lzk/base64", base64_api, dict(gconf=config))
     ])
 
 
@@ -26,14 +26,14 @@ def main():
     systemType = platform.system()  # "windows"#
 
     logger.debug("platform system type is %s" % systemType)
-    port = config.get("pedestrian_detection", 10086)
+    port = config.get("face_attr", 8704)
     logger.debug("start listening", port)
 
     if systemType.lower() == "windows":
         logger.debug("start single process")
         app = make_app(config)
         app.listen(port)
-        logger.info("pedestrian_detection process is started")
+        logger.info("face_attribute process is started")
         tornado.ioloop.IOLoop.current().start()
 
     else:
@@ -43,7 +43,7 @@ def main():
         app = make_app(config)
         http_server = tornado.httpserver.HTTPServer(app)
         http_server.add_sockets(sockets)
-        logger.info("pedestrian_detection process is started")
+        logger.info("face_attribute process is started")
         tornado.ioloop.IOLoop.instance().start()
 
 

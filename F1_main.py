@@ -2,14 +2,13 @@ import argparse
 import warnings
 from datetime import datetime
 
-import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.backends import cudnn
 from tqdm import tqdm
 
 import model as models
-from utils.datasets import attr_nums, MultiLabelDataset, description
+from utils.datasets import attr_nums, MultiLabelDataset
 from utils.display import *
 
 warnings.filterwarnings('ignore')
@@ -17,9 +16,9 @@ warnings.filterwarnings('ignore')
 parser = argparse.ArgumentParser(description='Face Attribute Framework')
 parser.add_argument('--batch_size', default=128, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--num_workers', default=4, type=int, required=False, help='(default=%(default)d)')
-parser.add_argument('--test_data_path', default='', type=str, required=False,
+parser.add_argument('--test_data_path', default='test_data/F1_test', type=str, required=False,
                     help='(default=%(default)s)')
-parser.add_argument('--test_data_label', default='', type=str, required=False,
+parser.add_argument('--test_data_label', default='test_data/F1_main_test.txt', type=str, required=False,
                     help='(default=%(default)s)')
 
 args = parser.parse_args()
@@ -86,12 +85,12 @@ def F1_test():
     during = (b - a).seconds
     print("batch_size = {}".format(args.batch_size))
     print("num_workers = {}".format(args.num_workers))
-    print("image_num = {}".format(test_dataset.__len__()))
-    print("time = {}".format(during))
-    if during == 0:
+    print("image_num = {} 张".format(test_dataset.__len__()))
+    print("time = {} s".format(during))
+    try:
+        print("infer speed = {} 张/s".format(test_dataset.__len__() / during))
+    except ZeroDivisionError:
         print("推理时间不足1s")
-    else:
-        print("infer speed = {}".format(test_dataset.__len__() / during))
 
 
 def test(val_loader, c_model, f_model, m_model, attr_num, description):
@@ -188,7 +187,7 @@ def test(val_loader, c_model, f_model, m_model, attr_num, description):
     print('=' * 100)
     print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
     mA = 0.0
-    for it in range(attr_nums['my_rap2']):
+    for it in range(attr_num):
         # print("it = {}, description[it] = {}".format(it, description[it]))
         cur_mA = ((1.0 * pos_cnt[it] / pos_tol[it]) + (1.0 * neg_cnt[it] / neg_tol[it])) / 2.0
         mA = mA + cur_mA

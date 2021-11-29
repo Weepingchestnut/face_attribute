@@ -227,7 +227,7 @@ def face_attr_dict_F1(c_output_list, f_output_list, m_output_list):
     face_dict['是否戴口罩'] = is_dict[mask_index]
     if mask_index == 0:     # 戴口罩
         F1_list[17] = 1
-    print("F1_list = {}".format(F1_list))
+    # print("F1_list = {}".format(F1_list))
 
     return F1_list
 
