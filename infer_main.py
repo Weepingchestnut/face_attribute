@@ -98,7 +98,7 @@ def batch_test(test_data_path):
     print("image_num = {} 张".format(test_dataset.__len__()))
     print("time = {} s".format(during))
     try:
-        print("infer speed = {} 张/s".format(test_dataset.__len__() / during))
+        print("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
     except ZeroDivisionError:
         print("推理时间不足1s")
 
@@ -141,7 +141,7 @@ def test(test_loader, c_model, f_model, m_model):
             if args.confidence:
                 attr_dict = face_attr_dict_c(c_output_list, f_output_list, m_output_list)
             else:
-                attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list, False)
+                attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list)
             # pprint(face_attr_dict(c_output_list, f_output_list, m_output_list))
             pprint(attr_dict)
             if args.show:

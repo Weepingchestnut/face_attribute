@@ -65,12 +65,22 @@ def res_message(img_index, mode):
         return '第' + str(img_index) + '张图片id为空'
     elif mode == 'base64':
         return '第' + str(img_index) + '张图片损坏/非base64编码'
-    elif mode == 'dict_format':
-        return '第' + str(img_index) + '张图片JSON格式错误'
+    elif mode == 'dict_format_0':
+        return '第' + str(img_index) + '张图片JSON格式缺失键img_id与base64_code'
+    elif mode == 'dict_format_1':
+        return '第' + str(img_index) + '张图片JSON缺失键base64_code'
+    elif mode == 'dict_format_10':
+        return '第' + str(img_index) + '张图片JSON缺失键img_id'
 
 
 def is_need_dict(img_dict):
-    return 'img_id' in img_dict.keys() and 'base64_code' in img_dict.keys()
+    record = 0
+    if 'img_id' in img_dict.keys():
+        record = record + 1
+    if 'base64_code' in img_dict.keys():
+        record = record + 10
+    return record
+    # return 'img_id' in img_dict.keys() and 'base64_code' in img_dict.keys()
 
 
 class base64_api(tornado.web.RequestHandler):
@@ -81,6 +91,7 @@ class base64_api(tornado.web.RequestHandler):
     # @tornado.web.asynchronous
     @tornado.gen.coroutine
     def post(self, *aegs, **kwargs):
+        start_time = time.time()
         request = json.loads(self.request.body)
         # img_id = request.get('img_id', '')
         # base64_code = request.get('base64_code', '')
@@ -96,10 +107,11 @@ class base64_api(tornado.web.RequestHandler):
         response = {'success': True, 'message': ['属性提取成功'], 'attribute': [], 'spendTime': '0 ms'}
         for i, img_dict in enumerate(img_list):
             # 判断JSON是否满足dict格式要求
-            if not is_need_dict(img_dict):
+            get_record = is_need_dict(img_dict)
+            if get_record < 11:
                 response['success'] = False
                 response['message'][0] = '属性提取失败'
-                response['message'].append(res_message(i + 1, 'dict_format'))
+                response['message'].append(res_message(i + 1, 'dict_format_' + str(get_record)))
                 stat = False
             else:
                 # 图片id为空（字符串长度为0 or 字符串均为空格）
@@ -116,19 +128,16 @@ class base64_api(tornado.web.RequestHandler):
                     stat = False
 
         if not stat:
-            # print("stat = False")
             pass
         else:
-            # print("stat = True")
-            start_time = time.time()
+            # start_time = time.time()
             response['attribute'] = test(test_loader, celeba_model, fairface_model, face_mask_model)
-            end_time = time.time()
+            # end_time = time.time()
             # print(str(round((end_time - start_time), 4) * 1000) + " ms")
-            # response['message'].append('属性提取成功')
-            response['spendTime'] = str(round((end_time - start_time), 4) * 1000) + " ms"
-
-        print(response)
+        end_time = time.time()
+        response['spendTime'] = str(round((end_time - start_time), 4) * 1000) + " ms"
         self.write(response)
+        print(response)
 
 
 def pil_to_base64(p264_img):
@@ -251,7 +260,8 @@ def loop_test(data_path):
 
 
 def interface_test():
-    imag = Image.open('test_data/shisuo_face_test/face_于洪-4G清水湾温泉_123.296744_41.79479_20210416104413_0.9802733.jpg').convert('RGB')
+    imag = Image.open(
+        'test_data/shisuo_face_test/face_于洪-4G清水湾温泉_123.296744_41.79479_20210416104413_0.9802733.jpg').convert('RGB')
     base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
     # print("base64 = {}".format(base64_code))
     img1 = {
@@ -259,7 +269,8 @@ def interface_test():
         'base64_code': base64_code
     }
 
-    imag = Image.open('test_data/shisuo_face_test/face_于洪-ZH西湖叠院东门人行出_123.193184_41.799646_20210416113518_0.9816.jpg').convert('RGB')
+    imag = Image.open(
+        'test_data/shisuo_face_test/face_于洪-ZH西湖叠院东门人行出_123.193184_41.799646_20210416113518_0.9816.jpg').convert('RGB')
     base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
     # print("base64 = {}".format(base64_code))
     img2 = {
@@ -267,11 +278,13 @@ def interface_test():
         'base64_code': base64_code
     }
 
-    imag = Image.open('test_data/shisuo_face_test/face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg').convert('RGB')
+    imag = Image.open(
+        'test_data/shisuo_face_test/face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg').convert(
+        'RGB')
     base64_code = str(pil_to_base64(imag), 'utf-8')  # base64编码b' '前缀的去除
     # print("base64 = {}".format(base64_code))
     img3 = {
-        'img_id': 'face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg',
+        '': 'face_于洪-于洪广场家乐福-太湖街_123.305414_41.794836_20210416113449_0.99417347.jpg',
         'base64_code': base64_code
     }
 
@@ -288,10 +301,11 @@ def interface_test():
     response = {'success': True, 'message': ['属性提取成功'], 'attribute': [], 'spendTime': '0 ms'}
     for i, img_dict in enumerate(info_list):
         # 判断JSON是否满足dict格式要求
-        if not is_need_dict(img_dict):
+        get_record = is_need_dict(img_dict)
+        if get_record < 11:
             response['success'] = False
             response['message'][0] = '属性提取失败'
-            response['message'].append(res_message(i + 1, 'dict_format'))
+            response['message'].append(res_message(i + 1, 'dict_format_' + str(get_record)))
             stat = False
         else:
             # 图片id为空（字符串长度为0 or 字符串均为空格）
@@ -327,7 +341,7 @@ def test(test_loader, c_model, f_model, m_model):
     f_model.eval()
     m_model.eval()
     attr = []
-    img_dict = {'img_id': '', 'attr_dict': dict()}
+    # img_dict = {'img_id': '', 'attr_dict': dict()}
 
     for i, _ in enumerate(test_loader):
         # print(i+1)
@@ -347,6 +361,8 @@ def test(test_loader, c_model, f_model, m_model):
         m_output = torch.sigmoid(m_output.data).cpu().numpy()
 
         for one_bs in range(bs):
+            # img_dict = {'img_id': '', 'attr_dict': dict()}
+            img_dict = dict()
             # print("img_name: {}".format(img_name[one_bs]))
             one_img_name = img_name[one_bs]
             c_output_list = c_output[one_bs].tolist()
