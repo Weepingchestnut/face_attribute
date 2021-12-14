@@ -16,9 +16,9 @@ warnings.filterwarnings('ignore')
 parser = argparse.ArgumentParser(description='Face Attribute Framework')
 parser.add_argument('--batch_size', default=128, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--num_workers', default=4, type=int, required=False, help='(default=%(default)d)')
-parser.add_argument('--test_data_path', default='test_data/F1_test', type=str, required=False,
+parser.add_argument('--test_data_path', default='test_data/F1_face_test', type=str, required=False,
                     help='(default=%(default)s)')
-parser.add_argument('--test_data_label', default='test_data/F1_main_test.txt', type=str, required=False,
+parser.add_argument('--test_data_label', default='data_list/F1_face_test.txt', type=str, required=False,
                     help='(default=%(default)s)')
 
 args = parser.parse_args()
@@ -115,6 +115,7 @@ def test(val_loader, c_model, f_model, m_model, attr_num, description):
         neg_tol.append(0)
 
     for i, _ in tqdm(enumerate(val_loader), total=len(val_loader)):
+        # for i, _ in enumerate(val_loader):
         input, target = _
         input = input.cuda(non_blocking=True)
         c_output, f_output, m_output = c_model(input), f_model(input), m_model(input)
@@ -185,30 +186,30 @@ def test(val_loader, c_model, f_model, m_model, attr_num, description):
                 recall = recall + 1.0 * tp / (tp + fn)
 
     print('=' * 100)
-    print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
-    mA = 0.0
-    for it in range(attr_num):
-        # print("it = {}, description[it] = {}".format(it, description[it]))
-        cur_mA = ((1.0 * pos_cnt[it] / pos_tol[it]) + (1.0 * neg_cnt[it] / neg_tol[it])) / 2.0
-        mA = mA + cur_mA
-        print('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,
-                                                                               description[it],
-                                                                               pos_cnt[it],
-                                                                               neg_cnt[it],
-                                                                               pos_tol[it],
-                                                                               neg_tol[it],
-                                                                               (pos_cnt[it] + neg_tol[it] - neg_cnt[it]),
-                                                                               (neg_cnt[it] + pos_tol[it] - pos_cnt[it]),
-                                                                               cur_mA))
-    mA = mA / attr_num
-    print('\t' + 'mA:        ' + str(mA))
+    # print('\t     Attr              \tp_true/n_true\tp_tol/n_tol\tp_pred/n_pred\tcur_mA')
+    # mA = 0.0
+    # for it in range(attr_num):
+    #     # print("it = {}, description[it] = {}".format(it, description[it]))
+    #     cur_mA = ((1.0 * pos_cnt[it] / pos_tol[it]) + (1.0 * neg_cnt[it] / neg_tol[it])) / 2.0
+    #     mA = mA + cur_mA
+    #     print('\t#{:2}: {:18}\t{:4}\{:4}\t{:4}\{:4}\t{:4}\{:4}\t{:.5f}'.format(it,
+    #                                                                            description[it],
+    #                                                                            pos_cnt[it],
+    #                                                                            neg_cnt[it],
+    #                                                                            pos_tol[it],
+    #                                                                            neg_tol[it],
+    #                                                                            (pos_cnt[it] + neg_tol[it] - neg_cnt[it]),
+    #                                                                            (neg_cnt[it] + pos_tol[it] - pos_cnt[it]),
+    #                                                                            cur_mA))
+    # mA = mA / attr_num
+    # print('\t' + 'mA:        ' + str(mA))
 
     if attr_num != 1:
-        accu = accu / tol
+        # accu = accu / tol
         prec = prec / tol
         recall = recall / tol
         f1 = 2.0 * prec * recall / (prec + recall)
-        print('\t' + 'Accuracy:  ' + str(accu))
+        # print('\t' + 'Accuracy:  ' + str(accu))
         print('\t' + 'Precision: ' + str(prec))
         print('\t' + 'Recall:    ' + str(recall))
         print('\t' + 'F1_Score:  ' + str(f1))
