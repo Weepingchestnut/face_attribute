@@ -5,6 +5,7 @@ from datetime import datetime
 import torch
 import torchvision.transforms as transforms
 from torch.backends import cudnn
+from tqdm import tqdm
 
 import model as models
 from utils.datasets import attr_nums, get_test_data
@@ -16,12 +17,14 @@ warnings.filterwarnings('ignore')
 parser = argparse.ArgumentParser(description='Face Attribute Framework')
 parser.add_argument('--batch_size', default=128, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--num_workers', default=4, type=int, required=False, help='(default=%(default)d)')
-parser.add_argument('--test_data_path', default='test_data/shisuo_face_test', type=str, required=False,
+parser.add_argument('--test_data_path', default='test_data/shisuo_face_test_1k', type=str, required=False,
                     help='(default=%(default)s)')
 parser.add_argument('-s', '--show', dest='show', action='store_true', required=False,
                     help='show attribute in imag')
 parser.add_argument('-c', '--confidence', dest='confidence', action='store_true', required=False,
                     help='print attribute confidence in imag')
+parser.add_argument('-sp', '--speed', dest='speed', action='store_true', required=False, help='test infer speed')
+parser.add_argument('-spf', '--speed_print', dest='speed_print', action='store_true', required=False, help='test infer speed and print attribute')
 parser.add_argument('--save_path', default='work_dir/shisuo_face_test_output_img', type=str, required=False,
                     help='(default=%(default)s)')
 
@@ -93,14 +96,18 @@ def batch_test(test_data_path):
     test(test_loader, celeba_model, fairface_model, face_mask_model)
     b = datetime.now()
     during = (b - a).seconds
-    print("batch_size = {}".format(args.batch_size))
-    print("num_workers = {}".format(args.num_workers))
-    print("image_num = {} 张".format(test_dataset.__len__()))
-    print("time = {} s".format(during))
-    try:
-        print("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
-    except ZeroDivisionError:
-        print("推理时间不足1s")
+
+    if args.speed or args.speed_print:
+        print("=" * 100)
+        print("batch_size = {}".format(args.batch_size))
+        print("num_workers = {}".format(args.num_workers))
+        print("image_num = {} 张".format(test_dataset.__len__()))
+        print("time = {} s".format(during))
+        try:
+            print("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
+        except ZeroDivisionError:
+            print("推理时间不足1s")
+        print("=" * 100)
 
 
 def test(test_loader, c_model, f_model, m_model):
@@ -108,44 +115,62 @@ def test(test_loader, c_model, f_model, m_model):
     f_model.eval()
     m_model.eval()
 
-    for i, _ in enumerate(test_loader):
-        # print(i+1)
-        input, img_name = _
-        input = input.cuda(non_blocking=True)
-        c_output, f_output, m_output = c_model(input), f_model(input), m_model(input)
-        bs = input.size(0)
-        # print("bs = {}".format(bs))
+    if args.speed:
+        for i, _ in tqdm(enumerate(test_loader), total=len(test_loader)):
+            # print(i+1)
+            input, img_name = _
+            input = input.cuda(non_blocking=True)
+            c_output, f_output, m_output = c_model(input), f_model(input), m_model(input)
+            bs = input.size(0)
+            # print("bs = {}".format(bs))
 
-        # maximum voting
-        c_output = torch.max(torch.max(torch.max(c_output[0], c_output[1]), c_output[2]), c_output[3])
-        f_output = torch.max(torch.max(torch.max(f_output[0], f_output[1]), f_output[2]), f_output[3])
-        m_output = torch.max(torch.max(torch.max(m_output[0], m_output[1]), m_output[2]), m_output[3])
+            # maximum voting
+            c_output = torch.max(torch.max(torch.max(c_output[0], c_output[1]), c_output[2]), c_output[3])
+            f_output = torch.max(torch.max(torch.max(f_output[0], f_output[1]), f_output[2]), f_output[3])
+            m_output = torch.max(torch.max(torch.max(m_output[0], m_output[1]), m_output[2]), m_output[3])
 
-        c_output = torch.sigmoid(c_output.data).cpu().numpy()
-        f_output = torch.sigmoid(f_output.data).cpu().numpy()
-        m_output = torch.sigmoid(m_output.data).cpu().numpy()
+            c_output = torch.sigmoid(c_output.data).cpu().numpy()
+            f_output = torch.sigmoid(f_output.data).cpu().numpy()
+            m_output = torch.sigmoid(m_output.data).cpu().numpy()
+    else:
+        for i, _ in enumerate(test_loader):
+            # print(i+1)
+            input, img_name = _
+            input = input.cuda(non_blocking=True)
+            c_output, f_output, m_output = c_model(input), f_model(input), m_model(input)
+            bs = input.size(0)
+            # print("bs = {}".format(bs))
 
-        for one_bs in range(bs):
-            print("img_name: {}".format(img_name[one_bs]))
-            one_img_name = img_name[one_bs]
-            c_output_list = c_output[one_bs].tolist()
-            f_output_list = f_output[one_bs].tolist()
-            m_output_list = m_output[one_bs].tolist()
+            # maximum voting
+            c_output = torch.max(torch.max(torch.max(c_output[0], c_output[1]), c_output[2]), c_output[3])
+            f_output = torch.max(torch.max(torch.max(f_output[0], f_output[1]), f_output[2]), f_output[3])
+            m_output = torch.max(torch.max(torch.max(m_output[0], m_output[1]), m_output[2]), m_output[3])
 
-            # 置信度微调
-            if max(f_output_list[10], f_output_list[11], f_output_list[12], f_output_list[14],
-                   f_output_list[15], f_output_list[16]) > 0.8:
-                pass
-            else:
-                f_output_list[13] = f_output_list[13] * 1.5
-            if args.confidence:
-                attr_dict = face_attr_dict_c(c_output_list, f_output_list, m_output_list)
-            else:
-                attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list)
-            # pprint(face_attr_dict(c_output_list, f_output_list, m_output_list))
-            pprint(attr_dict)
-            if args.show:
-                show_attribute_img(one_img_name, attr_dict)
+            c_output = torch.sigmoid(c_output.data).cpu().numpy()
+            f_output = torch.sigmoid(f_output.data).cpu().numpy()
+            m_output = torch.sigmoid(m_output.data).cpu().numpy()
+
+            for one_bs in range(bs):
+                print("img_name: {}".format(img_name[one_bs]))
+                one_img_name = img_name[one_bs]
+                c_output_list = c_output[one_bs].tolist()
+                f_output_list = f_output[one_bs].tolist()
+                m_output_list = m_output[one_bs].tolist()
+
+                # 置信度微调
+                if max(f_output_list[10], f_output_list[11], f_output_list[12], f_output_list[14],
+                       f_output_list[15], f_output_list[16]) > 0.8:
+                    pass
+                else:
+                    f_output_list[13] = f_output_list[13] * 1.5
+                if args.confidence:
+                    attr_dict = face_attr_dict_c(c_output_list, f_output_list, m_output_list)
+                else:
+                    attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list)
+                # pprint(face_attr_dict(c_output_list, f_output_list, m_output_list))
+                print(attr_dict)
+                if args.show:
+                    show_attribute_img(one_img_name, attr_dict)
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 parser = argparse.ArgumentParser(description='Face Attribute Framework')
 parser.add_argument('--batch_size', default=128, type=int, required=False, help='(default=%(default)d)')
 parser.add_argument('--num_workers', default=4, type=int, required=False, help='(default=%(default)d)')
-parser.add_argument('--test_data_path', default='test_data/F1_face_test', type=str, required=False,
+parser.add_argument('--test_data_path', default='test_data/F1_face_data', type=str, required=False,
                     help='(default=%(default)s)')
 parser.add_argument('--test_data_label', default='data_list/F1_face_test.txt', type=str, required=False,
                     help='(default=%(default)s)')
