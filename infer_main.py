@@ -1,4 +1,6 @@
 import argparse
+import logging
+import traceback
 import warnings
 from datetime import datetime
 
@@ -8,6 +10,7 @@ from torch.backends import cudnn
 from tqdm import tqdm
 
 import model as models
+from mylogger import logger_init
 from utils.datasets import attr_nums, get_test_data
 from utils.display import *
 
@@ -99,15 +102,24 @@ def batch_test(test_data_path):
 
     if args.speed or args.speed_print:
         print("=" * 100)
-        print("batch_size = {}".format(args.batch_size))
-        print("num_workers = {}".format(args.num_workers))
-        print("image_num = {} 张".format(test_dataset.__len__()))
-        print("time = {} s".format(during))
+        # print("=" * 100)
+        logging.info("=" * 100)
+        # print("batch_size = {}".format(args.batch_size))
+        logging.info("batch_size = {}".format(args.batch_size))
+        # print("num_workers = {}".format(args.num_workers))
+        logging.info("num_workers = {}".format(args.num_workers))
+        # print("image_num = {} 张".format(test_dataset.__len__()))
+        logging.info("image_num = {} 张".format(test_dataset.__len__()))
+        # print("time = {} s".format(during))
+        logging.info("time = {} s".format(during))
         try:
-            print("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
+            # print("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
+            logging.info("infer speed = {} 张/s".format(round(test_dataset.__len__() / during, 2)))
         except ZeroDivisionError:
-            print("推理时间不足1s")
-        print("=" * 100)
+            # print("推理时间不足1s")
+            logging.info("推理时间不足1s")
+        # print("=" * 100)
+        logging.info("=" * 100)
 
 
 def test(test_loader, c_model, f_model, m_model):
@@ -151,7 +163,7 @@ def test(test_loader, c_model, f_model, m_model):
             m_output = torch.sigmoid(m_output.data).cpu().numpy()
 
             for one_bs in range(bs):
-                print("img_name: {}".format(img_name[one_bs]))
+                # print("img_name: {}".format(img_name[one_bs]))
                 one_img_name = img_name[one_bs]
                 c_output_list = c_output[one_bs].tolist()
                 f_output_list = f_output[one_bs].tolist()
@@ -168,10 +180,15 @@ def test(test_loader, c_model, f_model, m_model):
                 else:
                     attr_dict = face_attr_dict(c_output_list, f_output_list, m_output_list)
                 # pprint(face_attr_dict(c_output_list, f_output_list, m_output_list))
-                print(attr_dict)
+                # print(attr_dict)
+                logging.info("img_name: {} ".format(img_name[one_bs]) + str(attr_dict))
                 if args.show:
                     show_attribute_img(one_img_name, attr_dict)
 
 
 if __name__ == '__main__':
-    batch_test(args.test_data_path)
+    logger_init(log_file_name='infer_log', log_level=logging.INFO, log_dir='./logs/inference_log/')
+    try:
+        batch_test(args.test_data_path)
+    except:
+        logging.error(str(traceback.format_exc()))

@@ -1,6 +1,7 @@
 import argparse
 import base64
 import json
+import logging
 import time
 import warnings
 from datetime import datetime
@@ -137,7 +138,8 @@ class base64_api(tornado.web.RequestHandler):
         end_time = time.time()
         response['spendTime'] = str(round((end_time - start_time), 4) * 1000) + " ms"
         self.write(response)
-        print(response)
+        # print(response)
+        logging.info(str(response))
 
 
 def pil_to_base64(p264_img):
